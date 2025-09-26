@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Plataforma Comunitária de Segurança</title>
+  <link rel="stylesheet" href="style.css"/>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+</head>
+<body>
+
+  <!-- Cabeçalho fixo com animação -->
+  <header class="site-header" role="banner" aria-label="Cabeçalho do site">
+    <div class="inner">
+      <h1 class="site-title">Plataforma Comunitária de Segurança</h1>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- Barra de status de autenticação -->
+    <div id="authBar" class="auth-bar" role="region" aria-label="Barra de autenticação">
+      <div class="auth-left">
+        <span class="status-chip">Status</span>
+        <span id="loginStatus" class="status-value muted" aria-live="polite">Deslogado</span>
+      </div>
+      <button id="btnLogout" class="btn tertiary" type="button" aria-label="Sair" style="display:none;">
+        Sair
+      </button>
+    </div>
+
+    <!-- Cadastro / Login -->
+    <details class="card">
+      <summary><strong>Cadastro / Login</strong></summary>
+      <div class="grid-2"> 
+        <!-- CADASTRO -->
+        <form id="cadastroForm" class="stack" novalidate autocomplete="off" role="form" aria-label="Formulário de cadastro">
+          <h3>Cadastro</h3>
+          <label for="cadNome">Nome*</label>
+          <input type="text" id="cadNome" required>
+          <label for="cadSobrenome">Sobrenome*</label>
+          <input type="text" id="cadSobrenome" required>
+          <label for="cadEmail">E-mail*</label>
+          <input type="email" id="cadEmail" required>
+          <label for="cadSenha">Senha*</label>
+          <input type="password" id="cadSenha" minlength="6" required>
+          <button class="btn" type="submit">Criar conta</button>
+        </form>
+
+        <!-- LOGIN -->
+        <form id="loginForm" class="stack" novalidate autocomplete="off" role="form" aria-label="Formulário de login">
+          <h3>Login</h3>
+          <label for="logEmail">E-mail</label>
+          <input type="email" id="logEmail" required>
+          <label for="logSenha">Senha</label>
+          <input type="password" id="logSenha" required>
+          <button class="btn" type="submit">Entrar</button>
+        </form>
+      </div>
+    </details>
+
+    <!-- Painel de gerenciamento de usuários (apenas Admin) -->
+    <div id="userManagementCard" class="card stack" style="display:none;" aria-hidden="true">
+      <h2 class="section-title">Gerenciamento de Usuários</h2>
+      <p class="muted">Total de usuários cadastrados: <strong id="totalUsuarios">0</strong></p>
+      <ul id="listaUsuarios" class="user-list" aria-label="Lista de usuários"></ul>
+    </div>
+
+    <!-- FORMULÁRIO PRINCIPAL -->
+    <form id="ocorrenciaForm" class="card stack" novalidate role="form" aria-label="Formulário de registro de ocorrência">
+      <h2 class="section-title">Registrar Ocorrência</h2>
+
+      <label for="nome">Seu nome (opcional):</label>
+      <input type="text" id="nome" placeholder="Nome">
+
+      <label for="tipoOcorrencia">Tipo de ocorrência:</label>
+      <select id="tipoOcorrencia" required aria-required="true">
+        <option value="">Selecione...</option>
+        <option>Roubo</option>
+        <option>Furto</option>
+        <option>Drogas</option>
+        <option>Violência</option>
+        <option>Ameaça</option>
+        <option>Acidente</option>
+        <option>Outro</option>
+      </select>
+
+      <div class="grid-2">
+        <div>
+          <label for="tipoLogradouro">Tipo de logradouro:</label>
+          <select id="tipoLogradouro" required aria-required="true">
+            <option>Rua</option>
+            <option>Avenida</option>
+            <option>Alameda</option>
+            <option>Outro</option>
+          </select>
+        </div>
+        <div>
+          <label for="endereco">Nome do logradouro e bairro:</label>
+          <input type="text" id="endereco" placeholder="Ex: das Flores, Jardim Esperança" required>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div>
+          <label for="dataFato">Data/Hora do fato:</label>
+          <input type="datetime-local" id="dataFato" required>
+        </div>
+        <div class="row-inline">
+          <button type="button" id="btnGeocode" class="btn secondary" aria-label="Localizar no mapa">Localizar</button>
+        </div>
+      </div>
+
+      <label for="descricao">Descrição da ocorrência:</label>
+      <textarea id="descricao" placeholder="Descreva o ocorrido" required></textarea>
+
+      <button type="submit" class="btn">Registrar Ocorrência</button>
+      <p class="muted">Para <strong>registrar</strong> é necessário estar logado. Consultar é livre.</p>
+    </form>
+
+    <!-- LISTA + MAPA -->
+    <div class="card stack">
+      <h2 class="section-title">Ocorrências Registradas</h2>
+
+      <details>
+        <summary><strong>Filtros</strong></summary>
+        <div class="filters">
+          <select id="filtroTipo" aria-label="Filtrar por tipo">
+            <option value="">Todos os tipos</option>
+            <option>Roubo</option><option>Furto</option><option>Drogas</option>
+            <option>Violência</option><option>Ameaça</option><option>Acidente</option><option>Outro</option>
+          </select>
+          <input type="date" id="filtroIni" aria-label="Data inicial">
+          <input type="date" id="filtroFim" aria-label="Data final">
+          <button id="btnFiltrar" class="btn secondary" type="button" aria-label="Aplicar filtros">Filtrar</button>
+          <button id="btnLimpar" class="btn secondary" type="button" aria-label="Limpar filtros">Limpar</button>
+        </div>
+      </details>
+
+      <ul id="listaOcorrencias" aria-live="polite"></ul>
+
+      <details>
+        <summary><strong>Estatísticas</strong></summary>
+        <div class="card" id="estatisticasCard" style="margin: 10px 0;">
+          <h3 class="section-title">Estatísticas de Ocorrências</h3>
+          <p style="margin-bottom: 10px;">Total considerado: <strong id="totalOcorrenciasAprovadas">0</strong></p>
+          <ul id="listaEstatisticas"></ul>
+          <hr class="divider">
+          <div class="stack totals">
+            <p>Total pendentes: <strong id="totalPendentes">0</strong></p>
+            <p>Total aprovadas: <strong id="totalAprovadasTotal">0</strong></p>
+            <p>Total rejeitadas: <strong id="totalRejeitadas">0</strong></p>
+          </div>
+        </div>
+      </details>
+
+      <small class="muted">Os dados são baseados nas ocorrências no sistema.</small>
+
+      <h2 class="section-title">Mapa das Ocorrências</h2>
+      <div class="map-card">
+        <div id="map" class="map" role="region" aria-label="Mapa de ocorrências"></div>
+      </div>
+    </div>
+
+    <!-- Seção de Sites Úteis e Contatos -->
+    <section class="uteis card">
+      <h2 class="uteis-title">Sites Úteis e Contatos de Emergência</h2>
+      <ul class="uteis-list">
+        <li>
+          <a href="https://www.policiamilitar.mg.gov.br/" target="_blank">Polícia Militar</a>
+          <span class="phone">📞 Emergência: <strong>190</strong></span>
+        </li>
+        <li>
+          <a href="https://www.bombeiros.mg.gov.br/" target="_blank">Corpo de Bombeiros Militar</a>
+          <span class="phone">📞 Emergência: <strong>193</strong></span>
+        </li>
+        <li>
+          <a href="https://www.uberlandia.mg.gov.br/prefeitura/secretarias/secretaria-municipal-de-seguranca-integrada/" target="_blank">
+            Secretaria Municipal de Segurança Integrada – Uberlândia
+          </a>
+          <span class="phone">Contato: <strong>(34) 3239-2800</strong> (seg–sex, 7h–19h)</span>
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <!-- Rodapé -->
+  <footer class="site-footer" role="contentinfo" aria-label="Rodapé do site">
+    <div class="footer-inner">
+      <div class="footer-left">
+        <h4 class="footer-heading">Desenvolvido por:</h4>
+        <ul class="dev-list">
+          <li><span class="dev-name">Sérgio</span><span class="dev-ru">RU: 5262768</span></li>
+          <li><span class="dev-name">Everton</span><span class="dev-ru">RU: 524565</span></li>
+        </ul>
+      </div>
+
+      <!-- BLOCO DE COMPARTILHAMENTO (CENTRO) -->
+      <div class="footer-share" aria-label="Compartilhar este site">
+        <span class="share-label">Compartilhe</span>
+        <nav class="share-icons" aria-label="Botões de compartilhamento">
+          <a id="shareFb" class="share-btn" aria-label="Facebook" target="_blank" rel="noopener">
+            <!-- Facebook -->
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12.07C22 6.48 17.52 2 11.93 2S2 6.48 2 12.07c0 5 3.66 9.14 8.44 9.93v-7.02H7.9v-2.9h2.54V9.41c0-2.5 1.49-3.88 3.77-3.88 1.09 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.77-1.63 1.56v1.87h2.78l-.44 2.9h-2.34V22c4.78-.79 8.44-4.93 8.44-9.93z"/></svg>
+          </a>
+          <a id="shareWpp" class="share-btn" aria-label="WhatsApp" target="_blank" rel="noopener">
+            <!-- WhatsApp -->
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.52 3.48A11.94 11.94 0 0012 0C5.37 0 0 5.37 0 12c0 2.11.55 4.16 1.6 5.96L0 24l6.21-1.62A11.96 11.96 0 0012 24c6.63 0 12-5.37 12-12 0-3.2-1.25-6.21-3.48-8.52zM12 22a9.93 9.93 0 01-5.06-1.39l-.36-.21-3.7.96.99-3.6-.23-.37A9.94 9.94 0 012 12C2 6.48 6.48 2 12 2s10 4.48 10 10-4.48 10-10 10zm5.23-7.3c-.29-.15-1.7-.84-1.96-.93-.26-.1-.45-.15-.65.15-.19.29-.75.93-.92 1.12-.17.19-.34.21-.62.08-.29-.15-1.22-.45-2.32-1.44-.86-.77-1.44-1.72-1.61-2.01-.17-.29-.02-.45.13-.6.13-.13.29-.34.43-.51.15-.17.19-.29.29-.48.1-.19.05-.36-.02-.51-.07-.15-.65-1.57-.89-2.16-.23-.56-.47-.48-.65-.49l-.55-.01c-.19 0-.51.07-.78.36-.26.29-1 1-1 2.44s1.02 2.83 1.16 3.03c.15.19 2 3.05 4.84 4.28.68.29 1.21.46 1.62.59.68.22 1.3.19 1.79.11.55-.08 1.7-.69 1.94-1.36.24-.67.24-1.24.17-1.36-.06-.12-.26-.19-.55-.34z"/></svg>
+          </a>
+          <a id="shareMail" class="share-btn" aria-label="E-mail">
+            <!-- Email -->
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 13L0 6.75V18a2 2 0 002 2h20a2 2 0 002-2V6.75L12 13zM22 4H2l10 6 10-6z"/></svg>
+          </a>
+          <a id="shareX" class="share-btn" aria-label="X (Twitter)" target="_blank" rel="noopener">
+            <!-- X -->
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.9 2H22l-7.5 8.55L23.5 22H16l-5-6.5L5 22H2l8.2-9.36L.8 2h7l4.5 6L18.9 2z"/></svg>
+          </a>
+          <button id="shareCopy" class="share-btn btn-copy" type="button" aria-label="Copiar link">
+            <!-- Link/Instagram (copia link) -->
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.9 12a5 5 0 015-5h3v2h-3a3 3 0 100 6h3v2h-3a5 5 0 01-5-5zm6.2 1h3.8v-2H10.1v2zm9-6h-3V5h3a5 5 0 010 10h-3v-2h3a3 3 0 000-6z"/></svg>
+          </button>
+        </nav>
+      </div>
+
+      <div class="footer-right">
+        <a href="politica.html">Política de Privacidade</a><br/>
+        <a href="cartilhadeuso.html">Cartilha de Uso</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- App -->
+  <script src="app.js"></script>
+
+  <!-- Preenche os links de compartilhamento com a URL/título atuais -->
+  <script>
+    (function(){
+      const url = encodeURIComponent(window.location.href);
+      const title = encodeURIComponent(document.title);
+
+      const $ = (id) => document.getElementById(id);
+      if ($('shareFb'))  $('shareFb').href  = `https://www.facebook.com/sharer/sharer.php?u=${url}`;
+      if ($('shareWpp')) $('shareWpp').href = `https://wa.me/?text=${title}%20${url}`;
+      if ($('shareMail'))$('shareMail').href= `mailto:?subject=${title}&body=${url}`;
+      if ($('shareX'))   $('shareX').href   = `https://twitter.com/intent/tweet?url=${url}&text=${title}`;
+
+      const copyBtn = $('shareCopy');
+      if (copyBtn){
+        copyBtn.addEventListener('click', async ()=>{
+          try{
+            await navigator.clipboard.writeText(window.location.href);
+            alert('Link copiado! Cole no Instagram (bio/story) ou onde preferir.');
+          }catch(e){
+            prompt('Copie o link:', window.location.href);
+          }
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

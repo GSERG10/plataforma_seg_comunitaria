@@ -1,0 +1,321 @@
+/* ====== Base e escalas ====== */
+* { box-sizing: border-box; }
+:root{
+  /* Paleta */
+  --bg:#F7FAFC; --ink:#0B1F32; --ink-2:#2D5D9B; --card:#FFFFFF; --line:#C6D3E6;
+  --brand:#1F4E79; --ok:#2E7D32; --warn:#FFC107; --danger:#DC3545; --muted:#516F91;
+
+  /* Largura do conteúdo */
+  --container: 1200px;        /* antes 900px */
+  --radius: 16px;             /* + cantos arredondados */
+  --shadow: 0 10px 28px rgba(31,78,121,.16);
+}
+
+/* Tipografia fluida: cresce levemente em telas grandes */
+html,body{height:100%;}
+body{
+  font-family: Inter, system-ui, Segoe UI, Roboto, Arial, sans-serif;
+  background: var(--bg); color: var(--ink); margin: 0;
+  min-height: 100vh; display:flex; flex-direction:column;
+  font-size: clamp(16px, 1.05vw, 18px);  /* + encorpado */
+  line-height: 1.55;
+}
+h1,h2,h3{ margin:0 0 .9rem; text-align:center; }
+.center{ text-align:center; }
+
+.container{
+  max-width: var(--container);
+  width: 100%;
+  margin: 32px auto;
+  padding: 0 22px;
+  flex: 1 0 auto;
+}
+
+/* ====== Cabeçalho fixo ====== */
+.site-header{
+  position: fixed; top:0; left:0; right:0; z-index:1000;
+  backdrop-filter: saturate(160%) blur(8px);
+  background: rgba(247,250,252,.92);
+  border-bottom: 1px solid #dbe7f5;
+  transform: translateY(-8px);
+  animation: headerDrop .45s ease-out forwards;
+  transition: box-shadow .35s ease, background .35s ease, padding .25s ease;
+}
+.site-header .inner{ max-width: var(--container); margin:0 auto; padding:18px 22px; }
+.site-header.is-stuck{ box-shadow: var(--shadow); background: rgba(247,250,252,.98); }
+.site-title{ color:#163b66; letter-spacing:.3px; font-weight: 800; font-size: clamp(24px, 2.2vw, 40px); }
+@keyframes headerDrop{ to { transform: translateY(0); } }
+
+/* ====== Cards & layout ====== */
+.card{
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px 22px;             /* + preenchimento */
+  margin: 20px 0;
+  box-shadow: var(--shadow);
+}
+.stack > *{ margin:.7rem 0; }
+.grid-2{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.row-inline{ display:flex; gap:12px; align-items:flex-end; justify-content:flex-start; }
+.section-title{ font-size: 1.25rem; color:var(--muted); letter-spacing:.2px; font-weight: 800; }
+.muted{ opacity:.85; }
+
+/* ====== Inputs ====== */
+label{ display:block; margin:.3rem 0 .45rem; color: var(--ink-2); font-size:1rem; font-weight:600; }
+input,select,textarea{
+  width:100%; padding:12px 14px; border-radius:12px; border:1px solid #C6D0E0;
+  background:#fff; color:var(--ink); transition: box-shadow .2s, border-color .2s;
+  font-size:1rem;
+}
+input:focus,select:focus,textarea:focus{
+  outline:none; border-color:#9cc0eb; box-shadow:0 0 0 4px rgba(28,102,185,.12);
+}
+textarea{ min-height:130px; resize:vertical; }
+
+/* ====== Buttons ====== */
+.btn{
+  background: var(--brand); color:#fff; border:none; border-radius:14px;
+  padding:12px 16px; cursor:pointer; font-weight:800; font-size:1rem;
+  transition: transform .08s ease, box-shadow .2s ease, opacity .2s ease;
+  box-shadow: 0 10px 22px rgba(31,78,121,.18);
+}
+.btn:hover{ transform: translateY(-1px); box-shadow:0 14px 28px rgba(31,78,121,.22); }
+.btn:active{ transform: translateY(0); }
+.btn.secondary{ background: var(--ok); }
+.btn.tertiary{ background: #0b7dd6; }
+.btn.danger{ background: var(--danger); color:#fff; }
+.btn:disabled{ opacity:.6; cursor:not-allowed; }
+
+/* ====== Auth bar ====== */
+.auth-bar{
+  display:flex; align-items:center; justify-content:space-between; gap:14px;
+  background: linear-gradient(180deg,#eef5ff, #e4eefc);
+  border:1px solid #bcd0ea; color: var(--ink); border-radius: 16px;
+  padding: 14px 16px; box-shadow: var(--shadow);
+}
+.status-chip{
+  display:inline-block; background:#d6e6fb; color:#17406e; border:1px solid #bcd0ea;
+  padding:8px 12px; border-radius:999px; font-weight:800; margin-right:10px;
+}
+.status-value{
+  display:inline-block; background:#fff; border:1px solid #cfe0f5;
+  padding:8px 12px; border-radius:999px; min-width:130px; text-align:center; font-weight:800;
+}
+.auth-left{ display:flex; align-items:center; }
+
+/* ====== Lista de Ocorrências ====== */
+#listaOcorrencias{ list-style:none; margin:0; padding:0; }
+#listaOcorrencias li{
+  padding:12px 14px; border:1px solid #C7D7EA; background:#F6FAFF;
+  border-radius:12px; margin:10px 0; font-size:1rem;
+}
+
+/* ====== Emblemas ====== */
+.badge{
+  display:inline-block; padding:4px 10px; margin-left:10px; font-size:.8rem;
+  font-weight:800; line-height:1; text-transform:uppercase; border-radius:10px;
+}
+.badge.pendente{ background: var(--warn); color:#343A40; }
+.badge.aprovada{ background: var(--ok); color:#fff; }
+.badge.rejeitada{ background: var(--danger); color:#fff; }
+
+/* ====== Admin actions ====== */
+.admin-actions{ margin-top:12px; display:flex; justify-content:flex-end; gap:10px; }
+.admin-actions .btn{ padding:8px 12px; font-size:.9rem; }
+
+/* ====== Lista de Usuários ====== */
+.user-list{ list-style:none; padding:0; margin-top:1rem; }
+.user-list li{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:10px 12px; border-bottom:1px dashed #E0E7F0; font-size:1rem;
+}
+.user-list li:last-child{ border-bottom:none; }
+.user-actions{ flex-shrink:0; }
+
+/* ====== Painel de Estatísticas ====== */
+#listaEstatisticas{ list-style:none; padding:0; margin:12px 0; }
+.stats-item{ padding:10px 0; }
+.stats-label{ display:flex; justify-content:space-between; align-items:center; font-weight:700; margin-bottom:6px; }
+.stats-bar-container{ height:12px; background:#E9F1FB; border-radius:6px; overflow:hidden; margin-bottom:10px; }
+.stats-bar{ height:100%; background:#1F4E79; transition: width .5s ease-out; }
+.divider{ border:none; border-top:1px solid #E0E7F0; margin:18px 0; }
+.totals p{ margin:.35rem 0; }
+
+/* ====== Mapa ====== */
+.map-card{ border-radius: var(--radius); overflow:hidden; border:1px solid #C2CFDF; }
+.map{ height: 520px; width: 100%; }   /* + alto */
+
+/* ====== Seção Úteis ====== */
+.uteis-title{ color:#133d6b; margin-bottom: 14px; font-weight:800; }
+.uteis-list{ list-style:none; padding:0; margin:0; display:grid; gap:12px; }
+.uteis-list li{ display:flex; flex-direction:column; align-items:center; gap:8px; font-size:1rem; }
+.uteis-list a{ color:#0b55b8; font-weight:800; text-decoration:none; }
+.uteis-list a:hover{ text-decoration:underline; }
+.phone{ color:#0e2d55; }
+
+/* ====== Rodapé ====== */
+.site-footer{
+  flex-shrink:0;
+  background: linear-gradient(to bottom, #eef4fb, #e9f2ff);
+  border-top: 1px solid #d8e2f0;
+  box-shadow: 0 -8px 20px rgba(31,78,121,.08);
+
+}
+.footer-inner{
+  max-width: var(--container); margin:0 auto; padding:18px 22px;
+  display:flex; align-items:flex-start; justify-content:space-between; gap:18px;
+}
+.footer-heading{ margin:0 0 8px; color:#163b66; font-weight:800; font-size:1.05rem; text-align:left; }
+.dev-list{ list-style:none; padding:0; margin:0; }
+.dev-list li{ margin:3px 0 10px; }
+.dev-name{ display:block; font-weight:800; color:#0b2f56; }
+.dev-ru{ display:block; font-size: .95rem; color:#2d5d9b; opacity:.95; }
+.footer-right{ text-align:right; }
+.footer-right a{ color:#0b55b8; font-weight:800; text-decoration:none; }
+.footer-right a:hover{ text-decoration:underline; }
+
+/* ====== Responsividade ====== */
+@media (max-width: 900px){
+  .grid-2{ grid-template-columns:1fr; }
+  .footer-inner{ flex-direction:column; text-align:center; }
+  .footer-right{ text-align:center; }
+}
+
+/* ====== Sombra do cabeçalho quando rola ====== */
+body.scrolled .site-header{ box-shadow: 0 12px 28px rgba(31,78,121,.18); }
+
+/* ====== Telas muito largas: dá mais presença ====== */
+@media (min-width: 1440px){
+  :root{ --container: 1280px; }
+  .map{ height: 600px; }
+}
+
+/* ====== Refinos mobile ====== */
+html, body { overflow-x: hidden; }
+img, svg, video { max-width: 100%; height: auto; }
+#listaOcorrencias, .user-list, .uteis-list { overflow-wrap: anywhere; word-break: break-word; }
+
+@media (max-width: 900px){
+  .grid-2{ grid-template-columns: 1fr; }
+}
+
+@media (max-width: 600px){
+  /* conteúdo mais “cheio”, sem ficar apertado */
+  .container{ margin: 22px auto; padding: 0 14px; }
+  body{ font-size: 16px; line-height: 1.55; }
+
+  /* cabeçalho mais compacto */
+  .site-header .inner{ padding: 12px 14px; }
+  .site-title{ font-size: 20px; }
+
+  /* barra de status empilha e ocupa a largura toda */
+  .auth-bar{ flex-wrap: wrap; gap: 10px; }
+  .auth-left{ width: 100%; }
+  .status-value{ min-width: 0; width: 100%; text-align: left; }
+
+  /* botões fáceis de tocar */
+  .btn{ width: 100%; padding: 12px 14px; }
+
+  /* listas e cartões com mais respiro */
+  #listaOcorrencias li{ padding: 12px; }
+  .card{ padding: 16px; }
+
+  /* mapa não fica gigante em celulares */
+  .map{ height: 360px; }
+
+  /* rodapé empilhado e centralizado */
+  .footer-inner{ flex-direction: column; gap: 8px; text-align: center; }
+  .footer-right{ text-align: center; }
+}
+
+@media (max-width: 360px){
+  .site-title{ font-size: 18px; }
+  .status-chip{ padding: 6px 10px; }
+  .status-value{ padding: 6px 10px; }
+}
+
+/* ===== Rodapé simples, fino e preto ===== */
+.site-footer{
+  background: linear-gradient(to bottom, #f5f7fb, #eef3ff); /* mantém a barra */
+  border-top: 1px solid #dde6f5;
+}
+.footer-inner{
+  padding: 10px 18px;          /* mais fino */
+  gap: 12px;
+  align-items: center;
+}
+
+/* esquerda */
+.footer-heading{
+  margin: 0 0 4px;
+  font-weight: 400;            /* sem negrito */
+  font-size: 0.95rem;
+  color: #000;                 /* preto */
+}
+.dev-list{ margin: 0; padding: 0; }
+.dev-list li{ margin: 0 0 6px; line-height: 1.25; }
+.dev-name,
+.dev-ru{
+  font-weight: 400;            /* sem formatação */
+  color: #000;                 /* preto */
+  font-size: 0.95rem;
+}
+
+/* direita (links discretos) */
+.footer-right{ text-align: right; }
+.footer-right a{
+  color: #0000FF;                 /* menos destaque */
+  font-weight: 400;            /* sem negrito */
+  text-decoration: none;
+  font-size: 0.95rem;
+}
+.footer-right a:hover{ text-decoration: underline; }
+
+/* mobile: mantém tudo simples e alinhado */
+@media (max-width: 720px){
+  .footer-inner{ flex-direction: column; align-items: flex-start; text-align: left; }
+  .footer-right{ text-align: left; }
+}
+
+/* ===== Compartilhamento no rodapé (coluna central) ===== */
+.footer-left, .footer-share, .footer-right { flex: 1; }
+.footer-left  { text-align: left;  }
+.footer-share { text-align: center; }
+.footer-right { text-align: right; }
+
+.footer-share .share-label{
+  display:block;
+  margin-bottom:6px;
+  font-size:.95rem;
+  color:#000;
+  font-weight:400;     /* simples */
+}
+
+.share-icons{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+}
+
+.share-btn{
+  width:38px; height:38px;
+  display:inline-flex; align-items:center; justify-content:center;
+  border-radius:8px;
+  background:#fff;
+  border:1px solid #d6dff0;
+  box-shadow: 0 2px 6px rgba(0,0,0,.06);
+  transition: transform .06s ease;
+  cursor:pointer;
+}
+.share-btn:hover{ transform: translateY(-1px); }
+.share-btn svg{ width:20px; height:20px; fill:#222; }
+.btn-copy{ border:none; }
+
+/* Mobile: empilha, mas mantém o bloco de compartilhamento centralizado */
+@media (max-width: 720px){
+  .footer-inner{ flex-direction: column; align-items: stretch; text-align: left; gap: 10px; }
+  .footer-left, .footer-share, .footer-right{ text-align: left; }
+  .share-icons{ justify-content:flex-start; }
+}
