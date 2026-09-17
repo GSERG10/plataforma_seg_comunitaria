@@ -11,6 +11,21 @@ let ocorrencias = [];
 let usuarioLogado = null;
 let tempCoords = null;
 let filtrosAtivos = { tipo: "", inicio: "", fim: "" };
+let selectionMarker = null;
+let mapSelectionMode = false;
+let ultimaRequisicaoNominatim = 0;
+
+const UF_PARA_ESTADO = {
+  AC: "Acre", AL: "Alagoas", AP: "Amapá", AM: "Amazonas", BA: "Bahia", CE: "Ceará",
+  DF: "Distrito Federal", ES: "Espírito Santo", GO: "Goiás", MA: "Maranhão", MT: "Mato Grosso",
+  MS: "Mato Grosso do Sul", MG: "Minas Gerais", PA: "Pará", PB: "Paraíba", PR: "Paraná",
+  PE: "Pernambuco", PI: "Piauí", RJ: "Rio de Janeiro", RN: "Rio Grande do Norte",
+  RS: "Rio Grande do Sul", RO: "Rondônia", RR: "Roraima", SC: "Santa Catarina",
+  SP: "São Paulo", SE: "Sergipe", TO: "Tocantins"
+};
+const ESTADO_PARA_UF = Object.fromEntries(
+  Object.entries(UF_PARA_ESTADO).map(([uf, estado]) => [estado.toLocaleLowerCase("pt-BR"), uf])
+);
 
 // --- Inicialização do Mapa ---
 const map = L.map("map").setView([-18.9186, -48.2772], 13);
@@ -20,57 +35,421 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 }).addTo(map);
 
 const markersLayer = L.layerGroup().addTo(map);
+const selectionLayer = L.layerGroup().addTo(map);
 
-// --- Geocodificação ---
-async function geocodeAddress(fullAddress) {
-  const searchAddress = `${fullAddress}, Uberlândia, MG`;
-  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchAddress)}&limit=1`;
+// --- Endereço, CEP e geocodificação ---
+function somenteDigitos(valor) {
+  return String(valor || "").replace(/\D/g, "");
+}
 
-  try {
-    const response = await fetch(url, { headers: { "Accept-Language": "pt-BR" } });
-    const data = await response.json();
+function formatarCep(valor) {
+  const cep = somenteDigitos(valor).slice(0, 8);
+  return cep.length > 5 ? `${cep.slice(0, 5)}-${cep.slice(5)}` : cep;
+}
 
-    if (data && data.length > 0) {
-      const result = data[0];
-      return {
-        lat: parseFloat(result.lat),
-        lng: parseFloat(result.lon),
-        displayName: result.display_name,
-      };
-    }
-    return null;
-  } catch (error) {
-    console.error("Erro ao buscar coordenadas:", error);
-    return null;
+function normalizarUF(valor) {
+  return String(valor || "").trim().toUpperCase().slice(0, 2);
+}
+
+function montarEnderecoDigitado() {
+  const logradouro = document.getElementById("logradouro").value.trim();
+  const numero = document.getElementById("numero").value.trim();
+  const bairro = document.getElementById("bairro").value.trim();
+  const cidade = document.getElementById("cidade").value.trim();
+  const uf = normalizarUF(document.getElementById("uf").value);
+  const cep = formatarCep(document.getElementById("cep").value);
+  const complemento = document.getElementById("complemento").value.trim();
+
+  const partes = [];
+  if (logradouro) partes.push(numero ? `${logradouro}, ${numero}` : logradouro);
+  if (bairro) partes.push(bairro);
+  if (cidade || uf) partes.push([cidade, uf].filter(Boolean).join(" - "));
+  if (cep) partes.push(`CEP ${cep}`);
+  if (complemento) partes.push(complemento);
+  return partes.join(", ");
+}
+
+function setAddressStatus(texto, tipo = "muted") {
+  const el = document.getElementById("addressStatus");
+  if (!el) return;
+  el.className = `address-status ${tipo}`;
+  el.textContent = texto;
+}
+
+function limparResultadosEndereco() {
+  const container = document.getElementById("addressResults");
+  if (!container) return;
+  container.innerHTML = "";
+  container.hidden = true;
+}
+
+function limparSelecaoEndereco(mensagem = "Localização ainda não confirmada.") {
+  tempCoords = null;
+  selectionMarker = null;
+  selectionLayer.clearLayers();
+  limparResultadosEndereco();
+  setAddressStatus(mensagem, "muted");
+}
+
+function preencherCamposComEndereco(address = {}) {
+  const logradouro = address.road || address.pedestrian || address.footway || address.path || "";
+  const bairro = address.suburb || address.neighbourhood || address.quarter || address.city_district || "";
+  const cidade = address.city || address.town || address.municipality || address.village || "";
+  const estado = address.state || "";
+  const uf = estado ? ESTADO_PARA_UF[estado.toLocaleLowerCase("pt-BR")] || "" : "";
+  const cep = address.postcode || "";
+  const numero = address.house_number || "";
+
+  if (logradouro) document.getElementById("logradouro").value = logradouro;
+  if (bairro) document.getElementById("bairro").value = bairro;
+  if (cidade) document.getElementById("cidade").value = cidade;
+  if (uf) document.getElementById("uf").value = uf;
+  if (cep) document.getElementById("cep").value = formatarCep(cep);
+  if (numero && !document.getElementById("numero").value.trim()) {
+    document.getElementById("numero").value = numero;
   }
 }
 
-document.getElementById("btnGeocode").addEventListener("click", async () => {
-  const tipoLogradouro = document.getElementById("tipoLogradouro").value;
-  const endereco = document.getElementById("endereco").value.trim();
-  const fullAddress = `${tipoLogradouro} ${endereco}`;
+async function aguardarLimiteNominatim() {
+  const agora = Date.now();
+  const espera = Math.max(0, 1100 - (agora - ultimaRequisicaoNominatim));
+  if (espera > 0) await new Promise((resolve) => setTimeout(resolve, espera));
+  ultimaRequisicaoNominatim = Date.now();
+}
 
-  if (!endereco) {
-    alert("Por favor, digite o nome do logradouro e bairro para localizar.");
+async function consultarNominatim(url) {
+  await aguardarLimiteNominatim();
+  const response = await fetch(url, {
+    headers: { "Accept-Language": "pt-BR,pt;q=0.9" },
+  });
+  if (!response.ok) throw new Error(`Falha na busca de endereço (${response.status}).`);
+  return response.json();
+}
+
+async function geocodeStructured({ logradouro, numero, bairro, cidade, uf, cep }) {
+  const params = new URLSearchParams({
+    format: "jsonv2",
+    addressdetails: "1",
+    limit: "5",
+    dedupe: "1",
+    country: "Brasil",
+    countrycodes: "br",
+  });
+
+  const ruaCompleta = [numero, logradouro].filter(Boolean).join(" ").trim();
+  if (ruaCompleta) params.set("street", ruaCompleta);
+  if (cidade) params.set("city", cidade);
+  if (uf) params.set("state", UF_PARA_ESTADO[uf] || uf);
+  if (cep) params.set("postalcode", somenteDigitos(cep));
+
+  let resultados = await consultarNominatim(`https://nominatim.openstreetmap.org/search?${params.toString()}`);
+
+  // Alguns números de imóveis não estão mapeados. Nesse caso, tenta a mesma rua sem o número.
+  if ((!resultados || resultados.length === 0) && numero && logradouro) {
+    params.set("street", logradouro);
+    resultados = await consultarNominatim(`https://nominatim.openstreetmap.org/search?${params.toString()}`);
+  }
+
+  // Bairro é usado para melhorar a escolha do usuário, mas não como campo estruturado do Nominatim.
+  if (bairro && Array.isArray(resultados)) {
+    const termoBairro = bairro.toLocaleLowerCase("pt-BR");
+    resultados.sort((a, b) => {
+      const aTem = String(a.display_name || "").toLocaleLowerCase("pt-BR").includes(termoBairro) ? 1 : 0;
+      const bTem = String(b.display_name || "").toLocaleLowerCase("pt-BR").includes(termoBairro) ? 1 : 0;
+      return bTem - aTem;
+    });
+  }
+
+  return resultados || [];
+}
+
+async function reverseGeocode(lat, lng) {
+  const params = new URLSearchParams({
+    format: "jsonv2",
+    lat: String(lat),
+    lon: String(lng),
+    zoom: "18",
+    addressdetails: "1",
+  });
+  return consultarNominatim(`https://nominatim.openstreetmap.org/reverse?${params.toString()}`);
+}
+
+function definirPontoSelecionado(lat, lng, endereco, popupText = "Localização confirmada") {
+  const latitude = Number(lat);
+  const longitude = Number(lng);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+
+  selectionLayer.clearLayers();
+  selectionMarker = L.marker([latitude, longitude], { draggable: true }).addTo(selectionLayer);
+  selectionMarker.bindPopup(popupText).openPopup();
+
+  selectionMarker.on("dragend", () => {
+    const pos = selectionMarker.getLatLng();
+    tempCoords = {
+      lat: pos.lat,
+      lng: pos.lng,
+      address: montarEnderecoDigitado() || endereco || "Ponto selecionado no mapa",
+    };
+    setAddressStatus("Ponto ajustado no mapa. Localização confirmada.", "success-text");
+  });
+
+  tempCoords = {
+    lat: latitude,
+    lng: longitude,
+    address: endereco || montarEnderecoDigitado() || "Ponto selecionado no mapa",
+  };
+  map.setView([latitude, longitude], 17);
+  setAddressStatus("Localização confirmada. Você pode arrastar o marcador para ajustar o ponto.", "success-text");
+}
+
+function renderizarResultadosEndereco(resultados) {
+  const container = document.getElementById("addressResults");
+  container.innerHTML = "";
+
+  if (!resultados.length) {
+    container.hidden = true;
     return;
   }
 
-  const coords = await geocodeAddress(fullAddress);
+  const titulo = document.createElement("strong");
+  titulo.textContent = resultados.length === 1 ? "Endereço encontrado:" : "Escolha o endereço correto:";
+  container.appendChild(titulo);
 
-  if (coords) {
-    tempCoords = { lat: coords.lat, lng: coords.lng, address: fullAddress };
-    map.setView([coords.lat, coords.lng], 16);
-    markersLayer.clearLayers();
-    L.marker([coords.lat, coords.lng])
-      .addTo(markersLayer)
-      .bindPopup(`Localização Confirmada: ${coords.displayName}`)
-      .openPopup();
-    alert(`Endereço localizado: ${coords.displayName}. Agora você pode registrar!`);
-  } else {
-    alert("Não foi possível localizar o endereço. Verifique a grafia e tente novamente.");
-    tempCoords = null;
+  resultados.forEach((resultado, indice) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "address-result-item";
+    button.innerHTML = `<span class="result-number">${indice + 1}</span><span>${escapeHtml(resultado.display_name || "Endereço encontrado")}</span>`;
+    button.addEventListener("click", () => {
+      preencherCamposComEndereco(resultado.address || {});
+      const enderecoFinal = montarEnderecoDigitado() || resultado.display_name;
+      definirPontoSelecionado(
+        parseFloat(resultado.lat),
+        parseFloat(resultado.lon),
+        enderecoFinal,
+        `Localização confirmada: ${escapeHtml(resultado.display_name || enderecoFinal)}`
+      );
+      container.hidden = true;
+    });
+    container.appendChild(button);
+  });
+
+  container.hidden = false;
+}
+
+async function buscarCep() {
+  const cepInput = document.getElementById("cep");
+  const cep = somenteDigitos(cepInput.value);
+  if (cep.length !== 8) {
+    alert("Digite um CEP com 8 números.");
+    cepInput.focus();
+    return false;
+  }
+
+  const btn = document.getElementById("btnBuscarCep");
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Buscando...";
+  setAddressStatus("Consultando CEP...", "muted");
+
+  try {
+    const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+    if (!response.ok) throw new Error("Falha ao consultar o CEP.");
+    const data = await response.json();
+    if (data.erro) throw new Error("CEP não encontrado.");
+
+    cepInput.value = formatarCep(data.cep || cep);
+    document.getElementById("logradouro").value = data.logradouro || "";
+    document.getElementById("bairro").value = data.bairro || "";
+    document.getElementById("cidade").value = data.localidade || "";
+    document.getElementById("uf").value = normalizarUF(data.uf || "");
+
+    limparSelecaoEndereco("CEP encontrado. Informe o número e clique em “Localizar endereço”.");
+    document.getElementById("numero").focus();
+    return true;
+  } catch (error) {
+    console.error("Erro ao consultar CEP:", error);
+    setAddressStatus("Não foi possível consultar o CEP. Você pode preencher o endereço manualmente.", "error-text");
+    alert(error.message || "Não foi possível consultar o CEP.");
+    return false;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+}
+
+document.getElementById("cep").addEventListener("input", (e) => {
+  e.target.value = formatarCep(e.target.value);
+  if (tempCoords) limparSelecaoEndereco("CEP alterado. Localize novamente para confirmar o ponto.");
+});
+
+document.getElementById("cep").addEventListener("blur", async (e) => {
+  if (somenteDigitos(e.target.value).length === 8 && !document.getElementById("logradouro").value.trim()) {
+    await buscarCep();
   }
 });
+
+document.getElementById("btnBuscarCep").addEventListener("click", buscarCep);
+
+["numero", "logradouro", "bairro", "cidade", "uf", "complemento"].forEach((id) => {
+  document.getElementById(id).addEventListener("input", () => {
+    if (tempCoords) limparSelecaoEndereco("Endereço alterado. Localize novamente para confirmar o ponto.");
+  });
+});
+
+document.getElementById("uf").addEventListener("input", (e) => {
+  e.target.value = normalizarUF(e.target.value);
+});
+
+document.getElementById("btnGeocode").addEventListener("click", async () => {
+  const logradouro = document.getElementById("logradouro").value.trim();
+  const numero = document.getElementById("numero").value.trim();
+  const bairro = document.getElementById("bairro").value.trim();
+  const cidade = document.getElementById("cidade").value.trim();
+  const uf = normalizarUF(document.getElementById("uf").value);
+  const cep = document.getElementById("cep").value.trim();
+
+  if (!logradouro || !numero || !cidade || !uf) {
+    alert("Preencha pelo menos logradouro, número, cidade e UF. Se souber o CEP, use-o para preencher os campos automaticamente.");
+    return;
+  }
+
+  const botao = document.getElementById("btnGeocode");
+  const textoOriginal = botao.textContent;
+  botao.disabled = true;
+  botao.textContent = "Localizando...";
+  limparResultadosEndereco();
+  setAddressStatus("Procurando o endereço no mapa...", "muted");
+
+  try {
+    const resultados = await geocodeStructured({ logradouro, numero, bairro, cidade, uf, cep });
+
+    if (!resultados.length) {
+      tempCoords = null;
+      setAddressStatus("Endereço não encontrado automaticamente. Revise os campos ou use “Selecionar no mapa”.", "error-text");
+      alert("Não foi possível localizar esse endereço automaticamente. Revise os dados ou use o botão “Selecionar no mapa”.");
+      return;
+    }
+
+    if (resultados.length === 1) {
+      const resultado = resultados[0];
+      preencherCamposComEndereco(resultado.address || {});
+      const enderecoFinal = montarEnderecoDigitado() || resultado.display_name;
+      definirPontoSelecionado(
+        parseFloat(resultado.lat),
+        parseFloat(resultado.lon),
+        enderecoFinal,
+        `Localização confirmada: ${escapeHtml(resultado.display_name || enderecoFinal)}`
+      );
+      return;
+    }
+
+    renderizarResultadosEndereco(resultados);
+    setAddressStatus("Foram encontrados alguns resultados. Selecione abaixo o endereço correto.", "muted");
+  } catch (error) {
+    console.error("Erro ao buscar coordenadas:", error);
+    tempCoords = null;
+    setAddressStatus("A busca de endereço está temporariamente indisponível. Tente novamente ou selecione o ponto no mapa.", "error-text");
+    alert("Não foi possível consultar o serviço de mapas agora. Tente novamente em alguns segundos ou selecione o ponto no mapa.");
+  } finally {
+    botao.disabled = false;
+    botao.textContent = textoOriginal;
+  }
+});
+
+document.getElementById("btnUseLocation").addEventListener("click", () => {
+  if (!navigator.geolocation) {
+    alert("Seu navegador não oferece suporte à localização do dispositivo.");
+    return;
+  }
+
+  const botao = document.getElementById("btnUseLocation");
+  const textoOriginal = botao.textContent;
+  botao.disabled = true;
+  botao.textContent = "Obtendo localização...";
+  setAddressStatus("Aguardando permissão para acessar sua localização...", "muted");
+
+  navigator.geolocation.getCurrentPosition(
+    async (position) => {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+
+      try {
+        const resultado = await reverseGeocode(lat, lng);
+        if (resultado?.address) preencherCamposComEndereco(resultado.address);
+        const enderecoFinal = montarEnderecoDigitado() || resultado?.display_name || "Minha localização atual";
+        definirPontoSelecionado(lat, lng, enderecoFinal, "Sua localização atual");
+      } catch (error) {
+        console.warn("Não foi possível detalhar a localização atual:", error);
+        definirPontoSelecionado(lat, lng, montarEnderecoDigitado() || "Minha localização atual", "Sua localização atual");
+      } finally {
+        botao.disabled = false;
+        botao.textContent = textoOriginal;
+      }
+    },
+    (error) => {
+      console.error("Erro de geolocalização:", error);
+      botao.disabled = false;
+      botao.textContent = textoOriginal;
+      setAddressStatus("Não foi possível acessar sua localização. Você pode localizar pelo endereço ou pelo mapa.", "error-text");
+      alert("Não foi possível obter sua localização. Verifique a permissão de localização do navegador.");
+    },
+    { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
+  );
+});
+
+document.getElementById("btnSelectMap").addEventListener("click", () => {
+  mapSelectionMode = !mapSelectionMode;
+  const botao = document.getElementById("btnSelectMap");
+  botao.textContent = mapSelectionMode ? "Cancelar seleção" : "Selecionar no mapa";
+  botao.classList.toggle("map-selection-active", mapSelectionMode);
+
+  if (mapSelectionMode) {
+    setAddressStatus("Clique no ponto exato do mapa. Depois, se precisar, arraste o marcador para ajustar.", "selection-text");
+    document.getElementById("map").scrollIntoView({ behavior: "smooth", block: "center" });
+  } else if (!tempCoords) {
+    setAddressStatus("Seleção no mapa cancelada.", "muted");
+  }
+});
+
+map.on("click", (event) => {
+  if (!mapSelectionMode) return;
+
+  const enderecoFinal = montarEnderecoDigitado();
+  if (!enderecoFinal) {
+    alert("Antes de selecionar no mapa, preencha pelo menos os dados básicos do endereço para que a ocorrência fique identificada corretamente.");
+    return;
+  }
+
+  definirPontoSelecionado(event.latlng.lat, event.latlng.lng, enderecoFinal, "Ponto selecionado manualmente");
+  mapSelectionMode = false;
+  const botao = document.getElementById("btnSelectMap");
+  botao.textContent = "Selecionar no mapa";
+  botao.classList.remove("map-selection-active");
+});
+
+// Compatibilidade com ocorrências antigas que eventualmente não tenham coordenadas salvas.
+async function geocodeAddress(fullAddress) {
+  const params = new URLSearchParams({
+    format: "jsonv2",
+    q: `${fullAddress}, Brasil`,
+    countrycodes: "br",
+    limit: "1",
+    addressdetails: "1",
+  });
+  try {
+    const data = await consultarNominatim(`https://nominatim.openstreetmap.org/search?${params.toString()}`);
+    if (!data?.length) return null;
+    return {
+      lat: parseFloat(data[0].lat),
+      lng: parseFloat(data[0].lon),
+      displayName: data[0].display_name,
+    };
+  } catch (error) {
+    console.error("Erro ao geocodificar ocorrência antiga:", error);
+    return null;
+  }
+}
 
 // --- Autenticação e perfis ---
 async function carregarPerfil(userId) {
@@ -404,7 +783,10 @@ document.getElementById("ocorrenciaForm").addEventListener("submit", async (e) =
   alert("Ocorrência registrada e enviada para moderação.");
   e.target.reset();
   tempCoords = null;
-  markersLayer.clearLayers();
+  selectionMarker = null;
+  selectionLayer.clearLayers();
+  limparResultadosEndereco();
+  setAddressStatus("Localização ainda não confirmada.", "muted");
   await carregarOcorrencias();
 });
 
@@ -451,27 +833,54 @@ function renderizarOcorrencias() {
       const actions = document.createElement("div");
       actions.classList.add("admin-actions");
 
-      if (o.status !== "aprovada") {
-        const btnAprovar = document.createElement("button");
-        btnAprovar.textContent = "Aprovar";
-        btnAprovar.classList.add("btn", "secondary");
-        btnAprovar.onclick = () => atualizarStatus(o.id, "aprovada");
-        actions.appendChild(btnAprovar);
-      }
+      const btnAprovar = document.createElement("button");
+      btnAprovar.textContent = "Aprovar";
+      btnAprovar.classList.add("btn", "secondary");
+      btnAprovar.onclick = () => atualizarStatus(o.id, "aprovada");
+      actions.appendChild(btnAprovar);
 
-      if (o.status !== "rejeitada") {
-        const btnRejeitar = document.createElement("button");
-        btnRejeitar.textContent = "Rejeitar";
-        btnRejeitar.classList.add("btn", "danger");
-        btnRejeitar.onclick = () => atualizarStatus(o.id, "rejeitada");
-        actions.appendChild(btnRejeitar);
-      }
+      const btnRejeitar = document.createElement("button");
+      btnRejeitar.textContent = "Rejeitar";
+      btnRejeitar.classList.add("btn", "danger");
+      btnRejeitar.onclick = () => atualizarStatus(o.id, "rejeitada");
+      actions.appendChild(btnRejeitar);
+
+      const btnExcluir = document.createElement("button");
+      btnExcluir.textContent = "Excluir";
+      btnExcluir.classList.add("btn", "danger");
+      btnExcluir.onclick = () => excluirOcorrencia(o.id);
+      actions.appendChild(btnExcluir);
 
       li.appendChild(actions);
     }
 
     lista.appendChild(li);
   });
+}
+
+async function excluirOcorrencia(id) {
+  if (usuarioLogado?.role !== "admin") return;
+
+  const ocorrencia = ocorrencias.find((o) => o.id === id);
+  if (!ocorrencia) return;
+
+  const confirmar = confirm(
+    `Tem certeza que deseja excluir definitivamente esta ocorrência?\n\n${ocorrencia.tipo} - ${ocorrencia.endereco}`
+  );
+  if (!confirmar) return;
+
+  const { error } = await supabaseClient
+    .from("ocorrencias")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error(error);
+    alert("Não foi possível excluir a ocorrência.");
+    return;
+  }
+
+  await carregarOcorrencias();
 }
 
 async function atualizarStatus(id, status) {

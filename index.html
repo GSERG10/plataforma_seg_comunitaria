@@ -86,31 +86,65 @@
         <option>Outro</option>
       </select>
 
-      <div class="grid-2">
-        <div>
-          <label for="tipoLogradouro">Tipo de logradouro:</label>
-          <select id="tipoLogradouro" required aria-required="true">
-            <option>Rua</option>
-            <option>Avenida</option>
-            <option>Alameda</option>
-            <option>Outro</option>
-          </select>
+      <div class="address-box" aria-label="Localização da ocorrência">
+        <div class="address-box-title">
+          <h3>Local da ocorrência</h3>
+          <span class="muted">Use o CEP para preencher o endereço automaticamente ou informe os campos manualmente.</span>
         </div>
-        <div>
-          <label for="endereco">Nome do logradouro e bairro:</label>
-          <input type="text" id="endereco" placeholder="Ex: das Flores, Jardim Esperança" required>
+
+        <div class="grid-2 address-grid-cep">
+          <div>
+            <label for="cep">CEP:</label>
+            <div class="input-action">
+              <input type="text" id="cep" inputmode="numeric" maxlength="9" placeholder="Ex: 38400-000" autocomplete="postal-code">
+              <button type="button" id="btnBuscarCep" class="btn tertiary compact-btn">Buscar CEP</button>
+            </div>
+          </div>
+          <div>
+            <label for="numero">Número:</label>
+            <input type="text" id="numero" placeholder="Ex: 123 ou S/N" autocomplete="address-line2" required>
+          </div>
         </div>
+
+        <div class="grid-2">
+          <div>
+            <label for="logradouro">Logradouro:</label>
+            <input type="text" id="logradouro" placeholder="Ex: Avenida João Naves de Ávila" autocomplete="address-line1" required>
+          </div>
+          <div>
+            <label for="bairro">Bairro:</label>
+            <input type="text" id="bairro" placeholder="Ex: Santa Mônica" required>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div>
+            <label for="cidade">Cidade:</label>
+            <input type="text" id="cidade" value="Uberlândia" autocomplete="address-level2" required>
+          </div>
+          <div>
+            <label for="uf">UF:</label>
+            <input type="text" id="uf" value="MG" maxlength="2" autocomplete="address-level1" required>
+          </div>
+        </div>
+
+        <label for="complemento">Complemento (opcional):</label>
+        <input type="text" id="complemento" placeholder="Ex: próximo à praça, bloco B, esquina..." autocomplete="address-line3">
+
+        <div class="address-actions">
+          <button type="button" id="btnGeocode" class="btn secondary" aria-label="Localizar endereço no mapa">Localizar endereço</button>
+          <button type="button" id="btnUseLocation" class="btn tertiary" aria-label="Usar minha localização atual">Usar minha localização</button>
+          <button type="button" id="btnSelectMap" class="btn" aria-label="Selecionar ponto diretamente no mapa">Selecionar no mapa</button>
+        </div>
+
+        <div id="addressStatus" class="address-status muted" role="status" aria-live="polite">
+          Localização ainda não confirmada.
+        </div>
+        <div id="addressResults" class="address-results" hidden aria-label="Resultados de endereços encontrados"></div>
       </div>
 
-      <div class="grid-2">
-        <div>
-          <label for="dataFato">Data/Hora do fato:</label>
-          <input type="datetime-local" id="dataFato" required>
-        </div>
-        <div class="row-inline">
-          <button type="button" id="btnGeocode" class="btn secondary" aria-label="Localizar no mapa">Localizar</button>
-        </div>
-      </div>
+      <label for="dataFato">Data/Hora do fato:</label>
+      <input type="datetime-local" id="dataFato" required>
 
       <label for="descricao">Descrição da ocorrência:</label>
       <textarea id="descricao" placeholder="Descreva o ocorrido" required></textarea>
