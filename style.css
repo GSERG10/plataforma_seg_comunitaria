@@ -131,7 +131,9 @@ textarea{ min-height:130px; resize:vertical; }
   padding:10px 12px; border-bottom:1px dashed #E0E7F0; font-size:1rem;
 }
 .user-list li:last-child{ border-bottom:none; }
-.user-actions{ flex-shrink:0; }
+.user-actions{ flex-shrink:0; display:flex; align-items:center; gap:10px; margin-left:14px; }
+.user-actions .btn{ padding:8px 12px; font-size:.9rem; white-space:nowrap; }
+.user-current{ font-size:.88rem; font-weight:700; white-space:nowrap; }
 
 /* ====== Painel de Estatísticas ====== */
 #listaEstatisticas{ list-style:none; padding:0; margin:12px 0; }
@@ -219,6 +221,9 @@ img, svg, video { max-width: 100%; height: auto; }
 
   /* listas e cartões com mais respiro */
   #listaOcorrencias li{ padding: 12px; }
+  .user-list li{ align-items:flex-start; gap:10px; flex-direction:column; }
+  .user-actions{ width:100%; margin-left:0; }
+  .user-actions .btn{ width:100%; }
   .card{ padding: 16px; }
 
   /* mapa não fica gigante em celulares */

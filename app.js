@@ -254,15 +254,87 @@ function renderizarUsuarios() {
 
   usuarios.forEach((u) => {
     const li = document.createElement("li");
-    li.innerHTML = `
-      <div>
-        <strong>${escapeHtml(`${u.nome || ""} ${u.sobrenome || ""}`.trim() || u.email)}</strong><br>
-        <small>${escapeHtml(u.email)}</small>
-        ${u.role === "admin" ? '<span class="badge aprovada">Admin</span>' : ""}
-      </div>
+
+    const info = document.createElement("div");
+    info.innerHTML = `
+      <strong>${escapeHtml(`${u.nome || ""} ${u.sobrenome || ""}`.trim() || u.email)}</strong><br>
+      <small>${escapeHtml(u.email)}</small>
+      ${u.role === "admin" ? '<span class="badge aprovada">Admin</span>' : ""}
     `;
+    li.appendChild(info);
+
+    const actions = document.createElement("div");
+    actions.classList.add("user-actions");
+
+    if (u.id === usuarioLogado.id) {
+      const atual = document.createElement("span");
+      atual.className = "muted user-current";
+      atual.textContent = "Sua conta";
+      actions.appendChild(atual);
+    } else if (u.role === "admin") {
+      const protegido = document.createElement("span");
+      protegido.className = "muted user-current";
+      protegido.textContent = "Admin protegido";
+      actions.appendChild(protegido);
+    } else {
+      const btnExcluir = document.createElement("button");
+      btnExcluir.type = "button";
+      btnExcluir.classList.add("btn", "danger", "btn-delete-user");
+      btnExcluir.textContent = "Excluir conta";
+      btnExcluir.setAttribute("aria-label", `Excluir conta de ${u.email}`);
+      btnExcluir.onclick = () => excluirUsuario(u, btnExcluir);
+      actions.appendChild(btnExcluir);
+    }
+
+    li.appendChild(actions);
     lista.appendChild(li);
   });
+}
+
+async function excluirUsuario(usuario, botao) {
+  if (usuarioLogado?.role !== "admin") {
+    alert("Apenas administradores podem excluir contas.");
+    return;
+  }
+
+  if (!usuario?.id || usuario.id === usuarioLogado.id || usuario.role === "admin") {
+    alert("Esta conta administrativa não pode ser excluída por este painel.");
+    return;
+  }
+
+  const nome = `${usuario.nome || ""} ${usuario.sobrenome || ""}`.trim() || usuario.email;
+  const confirmado = confirm(
+    `Excluir permanentemente a conta de ${nome} (${usuario.email})?\n\n` +
+    "O usuário perderá o acesso e o login será removido do sistema. Esta ação não pode ser desfeita."
+  );
+
+  if (!confirmado) return;
+
+  const textoOriginal = botao?.textContent || "Excluir conta";
+  if (botao) {
+    botao.disabled = true;
+    botao.textContent = "Excluindo...";
+  }
+
+  try {
+    const { data, error } = await supabaseClient.functions.invoke("admin-delete-user", {
+      body: { userId: usuario.id },
+    });
+
+    if (error) throw error;
+    if (!data?.success) throw new Error(data?.error || "Não foi possível excluir a conta.");
+
+    alert(`Conta ${usuario.email} excluída com sucesso.`);
+    await carregarUsuarios();
+    await carregarOcorrencias();
+  } catch (error) {
+    console.error("Erro ao excluir usuário:", error);
+    alert(error?.message || "Não foi possível excluir a conta do usuário.");
+    if (botao) {
+      botao.disabled = false;
+      botao.textContent = textoOriginal;
+    }
+  }
 }
 
 // --- Ocorrências ---
