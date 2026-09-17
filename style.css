@@ -149,12 +149,40 @@ textarea{ min-height:130px; resize:vertical; }
 .map{ height: 520px; width: 100%; }   /* + alto */
 
 /* ====== Seção Úteis ====== */
-.uteis-title{ color:#133d6b; margin-bottom: 14px; font-weight:800; }
-.uteis-list{ list-style:none; padding:0; margin:0; display:grid; gap:12px; }
-.uteis-list li{ display:flex; flex-direction:column; align-items:center; gap:8px; font-size:1rem; }
-.uteis-list a{ color:#0b55b8; font-weight:800; text-decoration:none; }
+.uteis-title{ color:#133d6b; margin-bottom: 18px; font-weight:800; }
+.uteis-list{
+  list-style:none;
+  padding:0;
+  margin:0;
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  column-gap:56px;
+  row-gap:18px;
+}
+.uteis-list li{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  font-size:1rem;
+  color:var(--ink);
+}
+/* Três contatos principais: esquerda, centro e direita. */
+.uteis-list{
+  grid-template-columns: 1fr 1.35fr 1fr;
+  align-items:start;
+  column-gap:36px;
+}
+.uteis-left{ align-items:flex-start; text-align:left; }
+.uteis-center{ align-items:center; text-align:center; }
+.uteis-right{ align-items:flex-end; text-align:right; }
+.uteis-list a,
+.uteis-list li > strong{
+  color:var(--ink);
+  font-weight:800;
+  text-decoration:none;
+}
 .uteis-list a:hover{ text-decoration:underline; }
-.phone{ color:#0e2d55; }
+.phone{ color:var(--ink); }
 
 /* ====== Rodapé ====== */
 .site-footer{
@@ -228,6 +256,12 @@ img, svg, video { max-width: 100%; height: auto; }
 
   /* mapa não fica gigante em celulares */
   .map{ height: 360px; }
+
+  /* contatos úteis voltam para uma coluna no celular */
+  .uteis-list{ grid-template-columns:1fr; gap:16px; }
+  .uteis-left,
+  .uteis-center,
+  .uteis-right{ align-items:center; text-align:center; }
 
   /* rodapé empilhado e centralizado */
   .footer-inner{ flex-direction: column; gap: 8px; text-align: center; }
